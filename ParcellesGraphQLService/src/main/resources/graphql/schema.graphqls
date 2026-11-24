@@ -1,0 +1,26 @@
+# Opérations de lecture
+type Query {
+    zones: [String!]!
+    cultures: [String!]!
+    parcelle(zoneId: String!): Parcelle
+    historiqueIrrigation(zoneId: String!): [IrrigationRecord!]!
+}
+
+# Type représentant une zone agricole
+type Parcelle {
+    zoneId: String!
+    cultures: [String!]!
+    latitude: Float
+    longitude: Float
+    stadeCroissance: String
+}
+
+# Type représentant une mesure d'irrigation
+type IrrigationRecord {
+    id: ID!
+    zoneId: String!
+    timestamp: String
+    irrigationStatus: String
+    irrigationAmountL: Float
+    waterFlowRateLMin: Float
+}

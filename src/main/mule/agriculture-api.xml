@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="506f4058-64c5-4aab-8179-8153e84ef06a" >
+		<http:listener-connection host="localhost" port="8085" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="c9a3acff-881b-4456-848d-ffbec55b39ac" >
+		<http:request-connection host="localhost" port="8081" />
+	</http:request-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="e6228043-9b55-47d6-848b-6d88fe34f6f5" >
+		<db:generic-connection url="jdbc:postgresql://localhost:5432/shared_database" driverClassName="org.postgresql.Driver" user="postgres" password="Chaki@007" />
+	</db:config>
+	<db:config name="Database_Config1" doc:name="Database Config" doc:id="26af2046-bc6f-4870-994e-b1656479de61">
+		<db:generic-connection url="jdbc:postgresql://localhost:5432/smart_agriculture" driverClassName="org.postgresql.Driver" user="postgres" password="Chaki@007" />
+	</db:config>
+	<http:request-config name="HTTP_Request_configuration1" doc:name="HTTP Request configuration" doc:id="f4b27efe-7cdf-4870-b899-409eb2170be6" >
+		<http:request-connection port="8000" host="localhost"/>
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration2" doc:name="HTTP Request configuration" doc:id="45c4a7db-57e2-4b63-92db-2fe9ac776de0" >
+		<http:request-connection host="localhost" port="8083" />
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration3" doc:name="HTTP Request configuration" doc:id="c6416811-4efa-4525-8277-232e78d5a4de" >
+		<http:request-connection host="localhost" port="8082" />
+	</http:request-config>
+	<flow name="graphql-irrigation-zoneId" doc:id="a5c294ed-fdf0-473a-b368-05f33ce1e0ce" >
+		<http:listener doc:name="Listener" doc:id="440fd233-3757-4df1-957d-189af9c0f254" config-ref="HTTP_Listener_config" path="/api/agriculture/graphql/irrigation/{zoneId}" allowedMethods = "GET"/>
+		<set-variable value="#[attributes.uriParams.zoneId]" doc:name="Set Variable" doc:id="232e50ea-bb7c-46c9-8d39-9a1c50791640" variableName="zone_irrig"/>
+		<ee:transform doc:name="Transform Message" doc:id="d1e60801-fe3e-41f9-92c8-d328b37f6b76" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "query": "query (\$zoneId: String!) { historiqueIrrigation(zoneId: \$zoneId) { id zoneId timestamp irrigationStatus irrigationAmountL waterFlowRateLMin } }",
+  "variables": {
+    "zoneId": vars.zone_irrig
+  }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="72ff7255-e5f3-471a-b24b-2f86fa494109" config-ref="HTTP_Request_configuration3" path="/graphql"/>
+		<db:insert doc:name="Insert" doc:id="b0185000-efc3-4176-ac0c-2c77dd942a62" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{operation: "POST /api/agriculture/graphql/irrigation/zoneId"}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="graphql-parcelles-zoneId" doc:id="b5503d97-ab76-48a0-a12c-ae989fd85b71" >
+		<http:listener doc:name="Listener" doc:id="9c1b07e1-eeef-411d-83d9-def31d19b8cf" config-ref="HTTP_Listener_config" path="/api/agriculture/graphql/parcelles/{zoneId}" allowedMethods = "GET"/>
+		<set-variable value="#[attributes.uriParams.zoneId]" doc:name="Set Variable" doc:id="ce5e2393-de0c-4640-9441-a99c33a7b310" variableName="zone_data"/>
+		<ee:transform doc:name="Transform Message" doc:id="5f2dcadd-e766-4e89-a1ca-a28896bcdea4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "query": "query (\$zoneId: String!) { parcelle(zoneId: \$zoneId) { zoneId cultures latitude longitude stadeCroissance } }",
+  "variables": {
+    "zoneId": vars.zone_data
+  }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="50740a67-0fd2-4030-befe-b665c724728d" config-ref="HTTP_Request_configuration3" path="/graphql">
+			<http:headers ><![CDATA[#[{
+	'Content-Type' : 'application/json'
+}]]]></http:headers>
+		</http:request>
+		<db:insert doc:name="Insert" doc:id="8ef52b65-5239-4e69-9f25-bf7d1423d599" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{operation: "POST /api/agriculture/graphql/parcelles/zoneId"}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="graphql-pacrelles-Cultures" doc:id="914b0885-9144-4930-a66f-56839d502042" >
+		<http:listener doc:name="Listener" doc:id="795c8ac2-149c-4609-91ef-c83eb2a00c05" config-ref="HTTP_Listener_config" path="/api/agriculture/graphql/cultures" allowedMethods="GET"/>
+		<set-variable value="#[attributes.uriParams.cultures]" doc:name="Set Variable" doc:id="34da6d7c-089f-480f-9388-7cb750d3731b" variableName="cult_data"/>
+		<ee:transform doc:name="Transform Message" doc:id="7d099aa2-de4a-4a51-ab90-f3dbc174ecf7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"query": "query { cultures }"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="13c3db3f-9ae6-4352-90a4-642f7445ea5f" config-ref="HTTP_Request_configuration3" path="/graphql"/>
+		<db:insert doc:name="Insert" doc:id="639bb20c-372f-4053-91a0-2e28cf2fa36d" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{operation: "POST /api/agriculture/graphql/cultures"}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="graphql-parcelles-Zones" doc:id="2aa38a0c-31c9-484f-8a56-d74a0a67a86d" >
+		<http:listener doc:name="Listener" doc:id="973e6d6a-5ed8-4dea-ab59-23feb56d5dbd" config-ref="HTTP_Listener_config" path="/api/agriculture/graphql/zones" allowedMethods = "GET"/>
+		<set-variable value="#[attributes.uriParams.zones]" doc:name="Set Variable" doc:id="88503384-a1f1-4d9f-9497-dc34fec77a02" variableName="zn_data"/>
+		<ee:transform doc:name="Transform Message" doc:id="29ffdb9a-3133-4190-a5d7-dbe7f65ab735" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"query": "query { zones }"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="a30eecfd-4acb-4ee8-923a-c2ea63e3516d" config-ref="HTTP_Request_configuration3" path="/graphql">
+			<http:headers ><![CDATA[#[{'Content-Type': 'application/json'}]]]></http:headers>
+		</http:request>
+		<db:insert doc:name="Insert" doc:id="387f4999-58aa-4ed5-a05b-b6fb76109557" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{operation: "POST /api/agriculture/graphql/zones"}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="patch-acknowledge-alert" doc:id="3e93767a-af25-4aeb-a2cf-2f215de8582b" >
+		<http:listener doc:name="Listener" doc:id="42cb432e-b29f-4da2-804a-cefb711fb446" config-ref="HTTP_Listener_config" path="/api/agriculture/alerts/{id}/acknowledge"/>
+		<set-variable value="#[attributes.uriParams.id]" doc:name="Set Variable" doc:id="617ba991-5206-44e7-b6fb-538c963111e4" variableName="alerte_id"/>
+		<http:request method="PATCH" doc:name="Request" doc:id="05032fbf-8f54-41c9-ba52-bf4fab93bdd0" config-ref="HTTP_Request_configuration2" path="#['/api/alerts/' ++ vars.alerte_id ++ '/acknowledge']"/>
+		<db:insert doc:name="Insert" doc:id="69549ca2-bbaf-4609-8513-fcebef5decdb" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{operation: "PATCH /api/agriculture/alerts/{id}/acknowledge"}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-all-alertrules" doc:id="13e07301-affa-4928-bb80-d3e3f78fa9f0" >
+		<http:listener doc:name="Listener" doc:id="4054a848-20ec-4b22-8752-388d716d031e" config-ref="HTTP_Listener_config" path="/api/agriculture/alertes/rules"/>
+		<http:request method="GET" doc:name="Request" doc:id="ef490882-3c31-4884-b75e-30944d10a1a5" config-ref="HTTP_Request_configuration2" path="/api/alerts/rules"/>
+		<db:insert doc:name="Insert" doc:id="a4476ab2-fbb3-41f2-9edd-5deaac05dbd0" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{operation: "GET /api/agriculture/alertes/rules"}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-all-alerts" doc:id="0cd2d832-f012-4e09-a6ec-56d323fad75f" >
+		<http:listener doc:name="Listener" doc:id="a9c6339d-6479-4e36-ad35-709a06f79fad" config-ref="HTTP_Listener_config" path="/api/agriculture/alerts"/>
+		<http:request method="GET" doc:name="Request" doc:id="b69a8e93-0bee-4db4-ac88-5d8a76386e02" config-ref="HTTP_Request_configuration2" path="/api/alerts"/>
+		<db:insert doc:name="Insert" doc:id="0624f163-6f2d-4931-a8d2-5fb299d075f0" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/alerts"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-alert-byId" doc:id="05c7ed45-00d3-4782-8c67-43b9e316fdcb" >
+		<http:listener doc:name="Listener" doc:id="43af23d9-d1ec-40b7-93a8-a3ec631a0c71" config-ref="HTTP_Listener_config" path="/api/agriculture/alerts/{id}"/>
+		<set-variable value="#[attributes.uriParams.id]" doc:name="Set Variable" doc:id="6df7a765-c518-4008-ad12-6da6ad7080ce" variableName="alert_id"/>
+		<http:request method="GET" doc:name="Request" doc:id="d63d064a-5319-4def-b3e8-a66f42f81db1" config-ref="HTTP_Request_configuration2" path="#['api/alerts/' ++ vars.alert_id]"/>
+		<db:insert doc:name="Insert" doc:id="da58fe38-274c-4abf-8801-d62f581fdc42" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/alerts/{id}"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-alerte-rules-ByZone" doc:id="3d9270a9-b7fe-4a0f-90a2-c4c4f8f8a058" >
+		<http:listener doc:name="Listener" doc:id="40d5f370-8df0-4620-a993-2d376298229b" config-ref="HTTP_Listener_config" path="/api/agriculture/alerts/rules"/>
+		<set-variable value="#[attributes.queryParams.zoneId]" doc:name="Set Variable" doc:id="b9c10555-3aa2-45b4-8ed0-2588a129d1b8" variableName="zone_value"/>
+		<http:request method="GET" doc:name="Request" doc:id="fa4457a2-bb8f-4a20-b966-8547edab1c8e" config-ref="HTTP_Request_configuration2" path="/api/alerts/rules">
+			<http:query-params ><![CDATA[#[{
+    zoneId: vars.zone_value
+}]]]></http:query-params>
+		</http:request>
+		<db:insert doc:name="Insert" doc:id="a4ee0af0-632a-47ad-9be0-6de2020f93df" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/alerts/rules/{zoneId}"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="post-evaluate-mlpred" doc:id="6ae6d1a4-aae0-483b-99a8-96d810b2494e" >
+		<http:listener doc:name="Listener" doc:id="a53eff25-bd1d-4e32-b133-4c89e102f964" config-ref="HTTP_Listener_config" path="/api/agriculture/alerts/evaluate-ml" allowedMethods = "GET"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="ff019785-d597-415e-ae06-2c455b027914" variableName="ml_eval"/>
+		<ee:transform doc:name="Transform Message" doc:id="ee9b64c4-12d7-41d8-8af2-ef8b0db839ef" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.ml_eval]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="0fae6aa2-8a37-4c6b-a240-e424a60fefe1" config-ref="HTTP_Request_configuration2" path="/api/alerts/evaluate-ml">
+			<http:headers ><![CDATA[#[{
+	'Content-Type' : 'application/json'
+}]]]></http:headers>
+		</http:request>
+		<db:insert doc:name="Insert" doc:id="449acbce-5661-4c0f-a911-da854ebd2639" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "POST /api/agriculture/alerts/evaluate-ml"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="post-evaluate-alert" doc:id="c73cd137-2081-4d53-b0de-c16e55a8fde6" >
+		<http:listener doc:name="Listener" doc:id="45ffc1cc-b16e-4238-a341-91f3589dfb78" config-ref="HTTP_Listener_config" path="/api/agriculture/alerts/evaluate" allowedMethods = "GET"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="dccba8ae-4565-4211-ad6d-265c7e0de627" variableName="eval_alert"/>
+		<ee:transform doc:name="Transform Message" doc:id="75413641-5100-4b7d-b164-32cbf6c1e98c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.eval_alert]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="766b0407-0e5a-4f39-9fd6-35a6e6b18fa9" config-ref="HTTP_Request_configuration2" path="/api/alerts/evaluate">
+			<http:headers ><![CDATA[#[{
+	'Content-Type' : 'application/json'
+}]]]></http:headers>
+		</http:request>
+		<db:insert doc:name="Insert" doc:id="94938114-a031-42e0-81f3-858b7a0e52c0" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "POST /api/agriculture/alerts/evaluate"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="post-alert-rule" doc:id="b9b9b1f4-b9d4-4475-9db7-34b7a9b6b15a">
+		<http:listener doc:name="Listener" doc:id="b6607f69-8ba2-4a25-911a-e893bfebd42e" config-ref="HTTP_Listener_config" path="/api/agriculture/alerts/rules" allowedMethods = "POST"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="b4b940f0-d9a8-4947-9d35-ad27bcfbf818" variableName="rule_data"/>
+		<ee:transform doc:name="Transform Message" doc:id="d7c42cbe-f5b6-4b39-9c71-4e8f3a9f1ea8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.rule_data
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="e5933240-cb4a-4eb5-8c64-483bccb3303f" path="/api/alerts/rules" config-ref="HTTP_Request_configuration2">
+			<http:headers ><![CDATA[#[{
+    'Content-Type': 'application/json'
+}]]]></http:headers>
+		</http:request>
+		<db:insert doc:name="Insert" doc:id="05bdddd8-cbef-4aa1-a6db-aef3924f1f15" config-ref="Database_Config1" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO alert_rules (
+    enabled,
+    metric,
+    operator,
+    severity,
+    threshold,
+    zone_id
+)
+VALUES (
+    :enabled,
+    :metric,
+    :operator,
+    :severity,
+    :threshold,
+    :zone_id
+);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    enabled: true,
+    metric: vars.rule_data.metric,
+    operator: vars.rule_data.operator,
+    severity: vars.rule_data.severity,
+    threshold: vars.rule_data.threshold,
+    zone_id: vars.rule_data.zoneId	
+}]]]></db:input-parameters>
+		</db:insert>
+		<set-payload value='#[{&#10;    message: "Alert rule created successfully",&#10;    zoneId: vars.rule_data.zoneId,&#10;    metric: vars.rule_data.metric,&#10;    operator: vars.rule_data.operator,&#10;    threshold: vars.rule_data.threshold,&#10;    severity: vars.rule_data.severity,&#10;    enabled: true&#10;}]' doc:name="Set Payload" doc:id="d4d4be57-97a3-47db-923a-6925ee57796b" />
+	</flow>
+	<flow name="post-predict-Disease" doc:id="0dd2fda2-f39f-404c-85f9-9bcff7d27933" >
+		<http:listener doc:name="Listener" doc:id="23687385-3272-41fb-80f9-75d1b91131c4" config-ref="HTTP_Listener_config" path="/api/agriculture/predict/disease" allowedMethods="GET"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="e373e358-c18b-481e-99e8-2d8e3c108fde" variableName="sensors"/>
+		<http:request method="POST" doc:name="Request" doc:id="1cb9d656-3251-4019-b7c2-b7d2b08dd1a6" config-ref="HTTP_Request_configuration1" path="/predict/disease">
+			<http:headers ><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+}]]]></http:headers>
+		</http:request>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="4acc38fa-03c3-4291-85bb-f1cbab36324b" variableName="predict"/>
+		<db:insert doc:name="Insert" doc:id="8f72472d-2fdd-4a9d-8e9e-5f6792ced7c0" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO disease_predictions (
+    crop_type,
+    growth_stage,
+    field_zone,
+    predicted_class,
+    class_1_probability,
+    model,
+    target,
+    sensor_data,
+    created_at
+)
+VALUES (
+    :crop_type,
+    :growth_stage,
+    :field_zone,
+    :predicted_class,
+    :class_1_probability,
+    :model,
+    :target,
+    CAST(:sensor_data AS JSONB),
+    CURRENT_TIMESTAMP
+);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    crop_type: vars.sensors.crop_type,
+    growth_stage: vars.sensors.growth_stage,
+    field_zone: vars.sensors.field_zone,
+    predicted_class: vars.predict.predicted_class,
+    class_1_probability: vars.predict.class_1_probability,
+    model: vars.predict.model,
+    target: vars.predict.target,
+    sensor_data: write(vars.sensors, "application/json")
+}]]]></db:input-parameters>
+		</db:insert>
+		<set-payload value="#[vars.predict]" doc:name="Set Payload" doc:id="9983c977-e846-4475-b5ad-b964c38e4111" />
+	</flow>
+	<flow name="post-predict-Yield" doc:id="f3ba7e8a-1877-44d8-aa7f-93703c951f38" >
+		<http:listener doc:name="Listener" doc:id="d77fc7f3-8ef8-4397-9d9f-16fbb4fa2810" config-ref="HTTP_Listener_config" path="/api/agriculture/predict/yield" allowedMethods = "GET"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="61591c34-0c06-41eb-9eba-a879e0254ce1" variableName="sensor_data"/>
+		<http:request method="POST" doc:name="Request" doc:id="30bff88a-2f4e-4b57-8786-317e3fdc27dd" config-ref="HTTP_Request_configuration1" path="/predict/yield">
+			<http:headers><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+}]]]></http:headers>
+		</http:request>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="690c86c2-3f94-4d74-8d41-def662fffc30" variableName="prediction"/>
+		<db:insert doc:name="Insert" doc:id="4fc6f9c9-55ab-46a2-bafa-fb2735a1aa58" config-ref="Database_Config" target="logResult">
+			<db:sql><![CDATA[INSERT INTO yield_predictions (
+    crop_type,
+    growth_stage,
+    field_zone,
+    predicted_yield_t_ha,
+    model,
+    target,
+    sensor_data,
+    created_at
+)
+VALUES (
+    :crop_type,
+    :growth_stage,
+    :field_zone,
+    :predicted_yield_t_ha,
+    :model,
+    :target,
+    CAST(:sensor_data AS JSONB),
+    CURRENT_TIMESTAMP
+);]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+    crop_type: vars.sensor_data.crop_type,
+    growth_stage: vars.sensor_data.growth_stage,
+    field_zone: vars.sensor_data.field_zone,
+    predicted_yield_t_ha: vars.prediction.predicted_yield_t_ha,
+    model: vars.prediction.model,
+    target: vars.prediction.target,
+    sensor_data: write(vars.sensor_data, "application/json")
+}]]]></db:input-parameters>
+		</db:insert>
+		<set-payload value="#[vars.prediction]" doc:name="Set Payload" doc:id="677b90cb-4a55-4449-848a-3ccb532b72c4" />
+	</flow>
+	<flow name="get-sensor-byStatus" doc:id="7fb6dbfe-c63f-42cb-872d-4dfb98bdc533" >
+		<http:listener doc:name="Listener" doc:id="0d1a9595-01bf-44e4-ae1c-98f45ee8d610" config-ref="HTTP_Listener_config" path="/api/agriculture/sensors/status/{status}"/>
+		<set-variable value="#[attributes.uriParams.status]" doc:name="Set Variable" doc:id="842e2a73-3b1a-4b0f-a39f-cff273a5c35e" variableName="Etat"/>
+		<http:request method="GET" doc:name="Request" doc:id="487673b4-4178-43ca-be80-82338e4e2010" path="#['api/iot/sensors/status/' ++ vars.Etat]" config-ref="HTTP_Request_configuration"/>
+		<db:insert doc:name="Insert" doc:id="c146f01a-af8f-4dc4-b0b1-489ed1f02e00" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/sensors/status/{status}"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-crops-cropType" doc:id="73605f2f-257c-49fe-a383-6b78f4fb38c9" >
+		<http:listener doc:name="Listener" doc:id="5eb5d10d-abe5-4d68-9d64-607fd7584ee7" config-ref="HTTP_Listener_config" path="/api/agriculture/crops/{cropType}"/>
+		<set-variable value="#[attributes.uriParams.cropType]" doc:name="Set Variable" doc:id="0250a8cd-41de-4a8c-bbf3-1adc94b50d31" variableName="Type"/>
+		<http:request method="GET" doc:name="Request" doc:id="cf4346d9-1879-4911-8178-cb49b32f129d" config-ref="HTTP_Request_configuration" path="#['api/iot/crops/' ++ vars.Type]"/>
+		<db:insert doc:name="Insert" doc:id="a45fcfe1-dc70-48c1-ae74-a66d3017639b" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/crops/{cropType}"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-zone-zoneID" doc:id="af9a47dc-7a0c-4b84-8465-3023ba14f9a2" >
+		<http:listener doc:name="Listener" doc:id="f1a1ab83-ff0e-45a6-be98-86f0fd1e701b" config-ref="HTTP_Listener_config" path="/api/agriculture/zones/{zoneId}"/>
+		<set-variable value="#[attributes.uriParams.zoneId]" doc:name="Set Variable" doc:id="3a2a3a6e-2b71-4aec-b7f8-9abc157d7808" variableName="numeroZone"/>
+		<http:request method="GET" doc:name="Request" doc:id="bef2cc2c-836e-4b23-9ab6-0fac54988abd" path="#['api/iot/zones/' ++ vars.numeroZone]" config-ref="HTTP_Request_configuration"/>
+		<db:insert doc:name="Insert" doc:id="b51ce51d-cf5a-45e0-8b26-ac42206e09e8" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/zones/{zoneId}"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-sensor-sensorID" doc:id="2e12a62f-c867-4a84-bf74-96071022db94" >
+		<http:listener doc:name="Listener" doc:id="ee6c7182-f522-4820-aba5-f88504672fab" config-ref="HTTP_Listener_config" path="/api/agriculture/sensors/{sensorId}"/>
+		<set-variable value="#[attributes.uriParams.sensorId]" doc:name="Set Variable" doc:id="445174ae-ed52-4bc1-9a31-bc52b6ac7b6d" variableName="numeroSensor"/>
+		<http:request method="GET" doc:name="Request" doc:id="4ad0ad8c-2d5e-4e81-8d65-6689b8d53be0" config-ref="HTTP_Request_configuration" path="#['api/iot/sensors/' ++ vars.numeroSensor]"/>
+		<db:insert doc:name="Insert" doc:id="85ddcd08-b855-4cb3-9551-a56499948988" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/sensors/{sensorId}"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-reading-byID-flow" doc:id="c1c3e019-175e-4577-a43b-a52385b9bf52" >
+		<http:listener doc:name="Listener" doc:id="5081780f-b69f-4124-adf4-d689ca8c9026" config-ref="HTTP_Listener_config" path="/api/agriculture/readings/{id}"/>
+		<set-variable value="#[attributes.uriParams.id]" doc:name="Set Variable" doc:id="2a67d614-265a-4508-b7f7-e14598610d97" variableName="numeroID"/>
+		<http:request method="GET" doc:name="Request" doc:id="64156364-b945-41d9-8ceb-6593c66729b1" config-ref="HTTP_Request_configuration" path="#['api/iot/readings/' ++ vars.numeroID]"/>
+		<db:insert doc:name="Insert" doc:id="5c0d1721-41e9-4b59-b311-1acb81727eec" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/readings/{id}"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="post-new-measure" doc:id="6f3af617-5823-47db-9a1b-979359edf7e7">
+		<http:listener doc:name="Listener" doc:id="fe764bc1-a79d-4a36-9e18-068a373c830b" config-ref="HTTP_Listener_config" path="/api/agriculture/readings" allowedMethods="POST" />
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="23e2d7c0-b8b2-4af2-8288-7ac456004bdf" variableName="measure" />
+		<ee:transform doc:name="Transform Message" doc:id="08921208-a10d-4b0b-9509-6d28642fb530">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.measure
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="bba237e9-a1e7-4254-9778-d3a986716d1d" config-ref="HTTP_Request_configuration" path="/api/iot/readings">
+			<http:headers><![CDATA[#[{
+    'Content-Type': 'application/json'
+}]]]></http:headers>
+		</http:request>
+		<db:insert doc:name="Insert" doc:id="f3f65683-65f8-40fd-9e31-dd281e4bc04b" config-ref="Database_Config" target="logResult">
+			<db:sql><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+    operation: "POST /api/agriculture/readings"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+	<flow name="get-all-readings-flow" doc:id="41f7bb91-7d57-4528-bff3-2edf9275dce4" >
+		<http:listener doc:name="Receive IoT Readings Request" doc:id="e8c4cf94-515b-48f1-ac74-a66b7a2546b2" config-ref="HTTP_Listener_config" path="/api/agriculture/readings" />
+		<http:request method="GET" doc:name="Request" doc:id="5f2ef3d6-57e0-4fbb-9333-024785451fe8" path="/api/iot/readings" config-ref="HTTP_Request_configuration"/>
+		<db:insert doc:name="Insert" doc:id="a29066ed-30eb-443b-a8c0-b371321812bf" config-ref="Database_Config" target="logResult">
+			<db:sql ><![CDATA[INSERT INTO mule_logs (operation, created_at)
+VALUES (:operation, CURRENT_TIMESTAMP);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    operation: "GET /api/agriculture/readings"
+}]]]></db:input-parameters>
+		</db:insert>
+	</flow>
+</mule>
